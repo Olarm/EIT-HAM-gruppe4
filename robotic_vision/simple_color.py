@@ -9,7 +9,7 @@ dir = "/Users/ola/dev/eit/data/stop_signs/"
 
 def find_contours(img):
     ret, thresh = cv2.threshold(img, 127, 255, 0)
-    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     return contours
 
@@ -29,7 +29,7 @@ def draw_square(img, contours):
     bounds = np.empty([0,4], dtype=np.int)
     for cnt in contours:
         [x,y,w,h] = cv2.boundingRect(cnt)
-        if (np.sqrt(w**2 + h**2) > 5) and (np.sqrt(w**2 - h**2) < 50):
+        if (np.sqrt(w**2 + h**2) > 3):# and (np.sqrt(w**2 - h**2) < 50):
             bounds = np.append(bounds, [[x, y, w, h]], axis=0)
 
     H, W = bounds.shape
@@ -57,17 +57,28 @@ def draw_square(img, contours):
     return img
 
 def get_mask(img):
-
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    low_red = np.array([161, 145, 60])
-    high_red = np.array([179, 255, 255])
-    red_mask = cv2.inRange(hsv, low_red, high_red)
+    hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
 
-    low_red2 = np.array([0, 155, 60])
-    high_red2 = np.array([25, 255, 255])
+    low_red1 = np.array([161, 145, 20])
+    high_red1 = np.array([179, 255, 255])
+    red_mask1 = cv2.inRange(hsv, low_red1, high_red1)
+
+    low_red2 = np.array([0, 145, 50])
+    high_red2 = np.array([21, 255, 255])
     red_mask2 = cv2.inRange(hsv, low_red2, high_red2)
 
-    return red_mask + red_mask2
+    low_red3 = np.array([161, 20, 125])
+    high_red3 = np.array([179, 155, 255])
+    red_mask3 = cv2.inRange(hls, low_red3, high_red3)
+
+    low_red4 = np.array([0, 50, 125])
+    high_red4 = np.array([21, 155, 255])
+    red_mask4 = cv2.inRange(hls, low_red4, high_red4)
+
+    red_mask = (red_mask1 + red_mask2 + red_mask3 + red_mask4)
+
+    return red_mask
 
 def main():
     for filename in os.listdir(dir):
