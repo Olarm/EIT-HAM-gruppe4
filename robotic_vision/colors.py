@@ -14,7 +14,7 @@ file1 = '/Users/ola/dev/eit/data/signDatabasePublicFramesOnly/vid6/frameAnnotati
 file2 = '/Users/ola/dev/eit/data/signDatabasePublicFramesOnly/vid6/frameAnnotations-MVI_0071.MOV_annotations/stop_1323896859.avi_image27.png'
 file3 = '/Users/ola/dev/eit/data/signDatabasePublicFramesOnly/vid6/frameAnnotations-MVI_0071.MOV_annotations/stop_1323896809.avi_image25.png'
 
-parser.add_argument('--input', help='Path to input image.', default=file2)
+parser.add_argument('--input', help='Path to input image.', default=file1)
 args = parser.parse_args()
 src = cv.imread(cv.samples.findFile(args.input))
 if src is None:
