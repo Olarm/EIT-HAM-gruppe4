@@ -10,14 +10,50 @@ dir = "/Users/ola/dev/eit/data/stop_signs/"
 def find_contours(img):
     ret, thresh = cv2.threshold(img, 127, 255, 0)
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
     return contours
 
-def draw_square(img, contours):
+
+def filter_contours(contours):
+    bounds = [[]]
     for cnt in contours:
         [x,y,w,h] = cv2.boundingRect(cnt)
         if (np.sqrt(w**2 + h**2) > 5) and (np.sqrt(w**2 - h**2) < 50):
-            cv2.rectangle(img ,(x-5,y-5),(x+w+5,y+h+5),(0,0,255),2)
+            bounds.append([x, y, w, h])
 
+
+def draw_square(img, contours):
+    print("########################################")
+    print("#############  NEXT IMAGE  #############")
+    print("########################################")
+    bounds = np.empty([0,4], dtype=np.int)
+    for cnt in contours:
+        [x,y,w,h] = cv2.boundingRect(cnt)
+        if (np.sqrt(w**2 + h**2) > 5) and (np.sqrt(w**2 - h**2) < 50):
+            bounds = np.append(bounds, [[x, y, w, h]], axis=0)
+
+    H, W = bounds.shape
+    merged = np.empty([0])
+    for i, b in enumerate(bounds):
+         for j, k in enumerate(bounds):
+            if not ((i in merged) or (j in merged)):
+                distance = np.sqrt((b[0] - k[0])**2 + (b[1] - k[1])**2 + (b[2] - k[2])**2 + (b[3] - k[3])**2)
+                if (distance > 0) and (distance < 30):
+                    temp = np.append([b], [k], axis=0)
+                    print(temp)
+                    x = np.amin([b[0], k[0]])
+                    y = np.amin([b[1], k[1]])
+                    w = max(b[2], k[2])
+                    h = b[3] + k[3]
+                    bounds = np.append(bounds, [[x,y,w,h]], axis=0)
+                    merged = np.append(merged, i)
+                    merged = np.append(merged, j)
+
+    merged = np.unique(merged)
+    bounds = np.delete(bounds, merged, 0)
+
+    for b in bounds:
+        cv2.rectangle(img ,(b[0]-5,b[1]-5),(b[0]+b[2]+5,b[1]+b[3]+5),(0,0,255),2)
     return img
 
 def get_mask(img):
