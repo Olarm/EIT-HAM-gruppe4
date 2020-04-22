@@ -14,6 +14,40 @@ dir = "/Users/ola/dev/eit/data/test/stopsign/"
 #dir = "/Users/ola/dev/eit/data/valid/stopsign/"
 
 
+def cnt_angles(contour):
+    temp_contour = np.empty((1,2))
+    temp_contour[0] = contour[-1]
+    temp_contour = np.append(temp_contour, contour[:, 0], axis=0)
+    temp_contour = np.append(temp_contour, contour[0], axis=0)
+    angles = np.empty((contour.shape[0], 1))
+    for i, cnt in enumerate(contour):
+        vec1 = [temp_contour[i+1,0] - temp_contour[i,0], temp_contour[i,1] - temp_contour[i+1,1]]
+        vec2 = [temp_contour[i+1,0] - temp_contour[i+2,0], temp_contour[i+2,1] - temp_contour[i+1,1]]
+        vec1 = vec1 / np.sqrt(vec1[0]**2 + vec1[1]**2)
+        vec2 = vec2 / np.sqrt(vec2[0]**2 + vec2[1]**2)
+
+        angle1 = np.arctan2(vec1[0], vec1[1])
+        angle2 = np.arctan2(vec2[0], vec2[1])
+
+        #angle = angle2 - angle1
+        angles[i] = angle2 - angle1
+
+        #if (angle < -2.40 and angle > -2.60) or (angle < 4.03 and angle > 3.82):
+        #    count += 1 
+
+    return angles
+
+def hough_lines(img_gray):
+    try:
+        edges = cv.Canny(img_gray,50,150,apertureSize = 3)
+        minLineLength = 5
+        maxLineGap = 10
+        lines = cv2.HoughLinesP(edges,1,np.pi/180,30,minLineLength,maxLineGap)
+        return edges, lines
+    except:
+        print("Canny error")
+        return None, None
+
 
 def orb_detect(img_gray):
     template_img = cv2.imread(template, cv2.IMREAD_GRAYSCALE)
@@ -49,13 +83,47 @@ def detect(img_gray, img, contours):
     for i, cnt in enumerate(contours):
         [x,y,w,h] = cv2.boundingRect(cnt)
         if np.sqrt(w**2 + h**2) > 10 and h > 1 and w > 1:
-            cv2.rectangle(img ,(x,y),(x+w,y+h),(0,0,255),2)
+            #cv2.rectangle(img ,(x,y),(x+w,y+h),(0,0,255), 2)
+            cv2.drawContours(img, contours, i, (0,0,255), 1)
             matches = orb_detect(img_gray[y:y+h, x:x+w])
+            hull_1 = cv2.convexHull(cnt, returnPoints=False)
+            hull = cv2.convexHull(cnt)
+            angles = cnt_angles(hull)
+            cv2.drawContours(img, hull, -1, (255,0,0), 4)
+            defects = cv2.convexityDefects(cnt, hull_1)
+            approx = cv2.approxPolyDP(cnt, 0.009 * cv2.arcLength(cnt, True), True)
+            hull_approx = cv2.approxPolyDP(hull, 0.009 * cv2.arcLength(hull, True), True)
+            if len(angles) >= 4:
+                temp_angles = np.empty(1)
+                temp_hull = np.empty((1,2))
+                for j, k in enumerate(hull[:,0]):
+                    angle = angles[j][0]
+                    if ((angle < -2.3 and angle > -2.6) or (angle > 3.2 and angle < 3.8)):
+                        temp_angles = np.append(temp_angles, angle)
+                        temp_hull = np.append(temp_hull, k, axis=0)
+                if len(temp_angles) >= 4:
+                    print(temp_hull)
+                    for j, k in enumerate(temp_hull):
+                        cv.putText(img, str(angle[j])[0:4], (k[0], k[1]), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
             if len(matches) > 0:
                 cv.putText(img, str(len(matches)), (x-5, y-5), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            if len(hull_approx) == 8:
+                cv.putText(img, str(len(hull_approx)), (x-5, y+h+5), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
             if len(matches) >= 5:
                 np.append(new_contours, contours[i])
-                cv.putText(img, "Stop sign", (x, y-5), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                cv.putText(img, "Stop sign", (x, y-5), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            elif len(approx) == 8 and len(defects) == 0:
+                np.append(new_contours, contours[i])
+                cv.putText(img, "Stop sign", (x, y-5), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            elif len(approx) == 8 and len(defects) > 0:
+                cv.putText(img, str(len(defects)), (x+w+5, y-5), cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+
 
     #print("#### OLD SHAPE: ", contours.shape)
     #print("#### NEW SHAPE: ", new_contours.shape)
@@ -153,32 +221,18 @@ def main():
             contours = find_contours(mask)
 
             #gray = cv.cvtColor(mask,cv.COLOR_BGR2GRAY)
-            edges = cv.Canny(blurred_mask,50,150,apertureSize = 3)
-            lines = cv.HoughLines(edges,1,np.pi/180,200)
             
-            try:
-                for line in lines:
-                    rho,theta = line[0]
-                    a = np.cos(theta)
-                    b = np.sin(theta)
-                    x0 = a*rho
-                    y0 = b*rho
-                    x1 = int(x0 + 1000*(-b))
-                    y1 = int(y0 + 1000*(a))
-                    x2 = int(x0 - 1000*(-b))
-                    y2 = int(y0 - 1000*(a))
-                    #cv.line(img,(x1,y1),(x2,y2),(0,0,255),2)
-            except TypeError:
-                print("typeerror #######")
-
             [img_detected, reduced_contours] = detect(img_gray, img, contours)
-            #img_rect = draw_square(img_detected, contours)
+            #img_rect = draw_square(img_detected, reduced_contours)
 
             #img_resized = cv2.resize(img_detected, (960, 540))
             cv2.imshow(filename, img_detected)
             key = cv2.waitKey(0)
             if key == 27:  # (escape to quit)
                 sys.exit()
+            
+            #elif key == 119:
+                #cv.imwrite("detected_"+filename, img_detected)
 
 
 
